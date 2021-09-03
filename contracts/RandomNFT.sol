@@ -7,17 +7,15 @@ import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract RandomNFT is ERC721, VRFConsumerBase, Ownable {
-    mapping(bytes32 => address) public requestIdToAddress;
-
-
+    
     uint256 immutable MAX_INT = 2**256 - 1;
-
     address immutable _redeemToken;
+
+    mapping(bytes32 => address) private requestIdToAddress;
     uint256 private fee;
     bytes32 private keyHash;
 
     mapping(uint256 => string) tokenURIs;
-
     uint256[] private unclaimed;
 
     constructor (address redeemToken) public
