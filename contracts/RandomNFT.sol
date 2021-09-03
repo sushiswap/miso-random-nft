@@ -7,13 +7,18 @@ import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract RandomNFT is ERC721, VRFConsumerBase, Ownable {
-    mapping(address => bytes32[]) public addressToRequestId;
+    mapping(bytes32 => address) public requestIdToAddress;
+
+
+    uint256 immutable MAX_INT = 2**256 - 1;
 
     address immutable _redeemToken;
-    uint256 fee;
-    bytes32 keyHash;
+    uint256 private fee;
+    bytes32 private keyHash;
 
     mapping(uint256 => string) tokenURIs;
+
+    uint256[] private unclaimed;
 
     constructor (address redeemToken) public
     ERC721("Random NFT", "$RAND")
@@ -30,34 +35,47 @@ contract RandomNFT is ERC721, VRFConsumerBase, Ownable {
         return "ipfs://ipfs/";
     }
 
-    function redeemSeed() public {
+    function redeemTokenForNFT() public {
         IERC20 token = IERC20(_redeemToken);
         uint256 balance = token.balanceOf(msg.sender) / 10 ** 18;
 
         token.transfer(address(0), balance);
         require(LINK.balanceOf(address(this)) >= fee * balance, "Not enough LINK - fill contract with faucet");
         for(uint256 i; i < balance; i++){
-            addressToRequestId[msg.sender].push(requestRandomness(keyHash, fee));
+            requestIdToAddress[requestRandomness(keyHash, fee)] = msg.sender;
         }
     }
 
-    function batchMint(address[] memory to, uint256[] memory tokenId, string[] memory _tokenURI) onlyOwner public {
-        for(uint256 i = 0; i < to.length; i++){
-            mint(to[i], tokenId[i], _tokenURI[i]);
-        }
-    }
-
-    function mint(address to, uint256 tokenId, string memory _tokenURI) onlyOwner public {
-        _mint(to, tokenId);
-        _setTokenURI(tokenId, _tokenURI);
-    }
-
-    function _setTokenURI(uint256 tokenId, string memory tokenURI) internal {
+    function premint(uint256 tokenId, string memory tokenURI) public onlyOwner {
         tokenURIs[tokenId] = tokenURI;
+        _mint(address(this), tokenId);
+        unclaimed.push(tokenId);
+    }
+
+    function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
+        require(_exists(tokenId), "ERC721Metadata: URI query for nonexistent token");
+
+        string memory baseURI = _baseURI();
+        return bytes(baseURI).length > 0 ? string(abi.encodePacked(baseURI, tokenURIs[tokenId])) : "";
     }
 
     function fulfillRandomness(bytes32 requestId, uint256 randomness) internal override {
-        // randomResult = randomness;
-        // process the the random data to assign a tokenId
+        address to = requestIdToAddress[requestId];
+        require(to == address(0), "fulfillRandomness: requestId does not exist");
+        requestIdToAddress[requestId] = address(0);
+
+        selectToken(to, randomness);
+    }
+
+    function selectToken(address to, uint256 randomness) internal {
+
+        // reducing randomness to the same order as unclaimed
+        // division will fail for divide by zero if the array is empty
+        uint256 scale = MAX_INT / unclaimed.length;
+        uint256 index = randomness / scale;
+        uint256 tokenId = unclaimed[index];
+        unclaimed[index] = 0;
+
+        transferFrom(address(this), to, tokenId);
     }
 }
