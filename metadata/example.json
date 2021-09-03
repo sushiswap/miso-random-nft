@@ -1,0 +1,12 @@
+{
+	"name":"car",
+	"description":"lorem ipsum",
+	"image":"",
+	"attributes":[
+			{
+				"key":"thing",
+				"trait_type":"thing",
+				"value":"stuff"
+			}
+		]
+}
