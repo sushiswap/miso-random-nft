@@ -61,7 +61,8 @@ contract RandomNFT is ERC721, VRFConsumerBase, AccessControl {
 
     function redeemTokenForNFT() public {
         IERC20 token = IERC20(_redeemToken);
-        uint256 balance = token.balanceOf(msg.sender) / 10 ** 18;
+        uint256 balance = token.balanceOf(msg.sender) / 1e18;
+        require(balance >= 1, "RandomNFT.redeemTokenForNFT: balance less than one");
 
         token.transferFrom(msg.sender, address(0), balance * 1e18);
         require(LINK.balanceOf(address(this)) >= fee * balance, "Not enough LINK - fill contract with faucet");
